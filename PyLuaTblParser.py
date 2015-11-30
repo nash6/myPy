@@ -50,7 +50,10 @@ class PyLuaTblParser(object):
 		pass
 
 	def dumpDict(self):
-		pass
+		for index, each in enumerate(self.pyList):
+			self.pyDict[index + 1] = each	
+		#need to beeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+		return self.pyDict
 
 	#private fun
 	def _lex(self):
@@ -104,7 +107,40 @@ class PyLuaTblParser(object):
 					raise TypeError('Extra [ %s', self.curr)
 
 			elif self.luaTblContent[self.curr] == '{':
-				pass
+				if self.stat not in (-2, 0):
+					raise TypeError('Error { %s', self.curr)
+
+				stack = []
+				begin = self.curr
+
+				self._next()
+				if self.curr >= len(self.luaTblContent):
+					raise TypeError('No match for [ %s', self.curr)
+				if self.luaTblContent[self.curr] in ('\'', '\"'):
+					stack.append(self.luaTblContent[self.curr])
+				while self.luaTblContent[self.curr] != '}' or stack:
+					self._next()
+					if self.curr >= len(self.luaTblContent):
+						raise TypeError('No match for [ %s', self.curr)
+					if self.luaTblContent[self.curr] in ('\'', '\"') and self.luaTblContent[self.curr -1 ] != '\\':
+						if not stack:
+							stack.append(self.luaTblContent[self.curr])
+						elif stack[-1] == self.luaTblContent[self.curr]:
+							stack.pop()
+						else:
+							stack.append(self.luaTblContent[self.curr])
+
+				recur = PyLuaTblParser()
+				recur.load(self.luaTblContent[begin:self.curr+1])
+
+				if self.stat == 0:
+					self.tmpKey = recur.dumpDict()
+					self.stat = 3
+				elif self.stat == -2:
+					self.tmpVal = recur.dumpDict()
+					self.stat = 2
+				self._next()
+
 			elif self.luaTblContent[self.curr] == '.': #num
 				pass
 			elif self.luaTblContent[self.curr] == '-':
@@ -161,11 +197,18 @@ class PyLuaTblParser(object):
 		else:
 			return True
 
+	def _checkNext(self, pat):
+		if self.curr + 1 >= len(self.luaTblContent):
+			return False
+		if self.luaTblContent[self.curr] in pat:
+			return True
+		else:
+			return False
 	
-
-	
-
 if __name__ == '__main__':
 	tPy = PyLuaTblParser()
-	tPy.load('{["abc"] = "123", "456" ,"av", }')
+	a = '{["abc"] = "123", ["456"] = {["12"] = "21","abc"} }'
+	tPy.load(a)
+	
+	print tPy.pyDict
 
