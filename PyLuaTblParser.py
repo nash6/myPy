@@ -6,15 +6,37 @@
 
 class PyLuaTblParser(object):
 	def __init__(self):
-		self.listCount = 0
 		self.pyDict = {}
 		self.pyList = []
-		pass
+		
 
 	def load(self, s):
+		'''load Lua table'''
+		if not isinstance(s, str):
+			raise TypeError('Input is NOT string!')
 
-		pass
-	
+		s = s.strip()
+		if not (s[0] == '{' and s[-1] == '}'):
+			raise TypeError('Input is NOT tableconstructor!')
+
+		s = s[1:-1].strip()
+
+		self.luaTblContent = s
+		self.curr = 0
+		self.stat = 0
+		'''
+		-2 wait for val when =
+		-1 wait for key when []
+		0 normal
+		1 has str or [] key
+		2 has key and val
+		3 has 'str' list
+		'''
+		self._lex()
+
+		print self.pyDict
+		print self.pyList
+
 	def dump(self):
 		pass
 
@@ -30,113 +52,120 @@ class PyLuaTblParser(object):
 	def dumpDict(self):
 		pass
 
-	#from now on
-	#fun are private
+	#private fun
+	def _lex(self):
+		spaces = ('\t', ' ', '\n', '\r', '\f', '\v')
+		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9')
+		while True:
+			if self.curr >= len(self.luaTblContent):
+				self._store()
+				break
 
-	def __addList(self, l):
+			if self.luaTblContent[self.curr] in spaces:
+				self._next()
+			elif self.luaTblContent[self.curr] in ('\'','\"'):
+				if self.stat == 0:
+					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
+					self.stat = 3
+				elif self.stat == -1:
+					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
+
+					if self.curr >= len(self.luaTblContent):
+						raise TypeError('stat -1 no ] %s', self.curr)
 		
+					while(self.luaTblContent[self.curr] != ']'):
+						if self.luaTblContent[self.curr] not in spaces:
+							raise TypeError('extra char  %s', self.curr)
+						self._next()
+						if self.curr >= len(self.luaTblContent):
+							raise TypeError('stat -1 no ] %s', self.curr)
+					self.stat = 1
+					self._next()	
+				elif self.stat == -2:
+					self.tmpVal = self._getStr(self.luaTblContent[self.curr])
+					self.stat = 2
+				else:
+					raise TypeError('Extra \' or " %s', self.curr)
+					
+			elif self.luaTblContent[self.curr] == '=':
+				if self.stat == 1:
+					self.stat = -2
+					self._next()
+				else:
+					raise TypeError('Extra = %s', self.curr)
+			elif self.luaTblContent[self.curr] in (',', ';'):
+				self._store()
+				self._next()
+			elif self.luaTblContent[self.curr] == '[':
+				if self.stat == 0:
+					self.stat = -1
+					self._next()
+				else:
+					raise TypeError('Extra [ %s', self.curr)
 
-	def __addDict(self, d):
+			elif self.luaTblContent[self.curr] == '{':
+				pass
+			elif self.luaTblContent[self.curr] == '.': #num
+				pass
+			elif self.luaTblContent[self.curr] == '-':
+				pass
+			elif self.luaTblContent[self.curr] in nums:
+				pass
+			elif self.luaTblContent[self.curr] == '\\':
+				pass
+			elif self.luaTblContent[self.curr].isalpha():
+				pass	
+			else:
+				print "Oop"
 
-	def _luaParse(self, s):	
-		if not self.__isStr(s):
-			raise TypeError('Input is NOT string!')
-		if not self.__isTableCons(s):
-			raise TypeError('Input is NOT tableconstructor!')
+	def _store(self):
+		if self.stat == -1:
+			raise TypeError("Wait for Key %s", self.curr)
+		elif self.stat == -2:
+			raise TypeError("Wait for Val %s", self.curr)
+		elif self.stat == 1 or self.stat == 3:
+			if self.tmpKey == None:
+				raise TypeError("stat 1 but No tmpKey %s", self.curr)
+			self.pyList.append(self.tmpKey)
+			self.tmpKey = None
+			self.stat = 0
+		elif self.stat == 2:
+			if self.tmpKey == None:
+				raise TypeError('No tmpKey when stat 2 %s', self.curr)
+			if self.tmpVal == None:
+				raise TypeError('No tmpVal when stat 2 %s', self.curr)
+			self.pyDict[self.tmpKey] = self.tmpVal
+			self.tmpKey = None
+			self.tmpVal = None
+			self.stat = 0
 
-		self.__analyse(s)
+	def _getStr(self, pat):
+		if not self._next():
+			raise TypeError('Error in %s: EOF', pat)
+		ret = self.luaTblContent.find(pat, self.curr + 1)
+		if not ret:
+			raise TypeError('Error in %s: no found', pat)
+		else:
+			while self.luaTblContent[ret - 1] ==  "\\":
+				ret = self.luaTblContent.find(pat, ret + 1)
+				if ret == -1:
+					raise TypeError('Error in %s: no found', pat)
+			ocurr = self.curr
+			self.curr = ret + 1	
+			return self.luaTblContent[ocurr:ret]
+
+	def _next(self):
+		self.curr += 1
+		if self.curr >= len(self.luaTblContent):
+			return False
+		else:
+			return True
 
 	
-	def __getKey(self, s):
-		s = self.__cutHeadTail(s)
-		if s.isdigit():
-			return int(s)
-		elif s[0] == '\"' and s[-1] == '\"':
-			return s[1:-1]
-		else:
-			raise TypeError('Key is not NUM or STR!')
 
-	def __getValue(self, s):
-		s = self.__cutHeadTail(s)
-		
-		if s.isdigit():
-			return int(s)
-		elif s[0] == '\"' and s[-1] == '\"':
-			return s[1:-1]
-		elif s[0] == '{':
-			pass
-			#return self.__
-		else:
-			return s
+	
 
-	def __getNext(self, s, pat):
-		s = self.__cutHeadTail(s)
-		index = s.find(pat)
-		return index
+if __name__ == '__main__':
+	tPy = PyLuaTblParser()
+	tPy.load('{["abc"] = "123", "456" ,"av", }')
 
-	def __analyse(self, s):#s is table constructor
-		s = self.__cutHeadTail(s)
-		s = s[1:-1]
-		s = self.__cutHeadTail(s)
-
-		if s[0] == '[':
-			rhs = s.find(']')
-			if rhs == -1:
-				raise TypeError('Input is NOT tableconstructor!')
-			#tmpKey is the Key
-			tmpKey = self.__getKey(s[1:rhs])
-			s = s[rhs + 1:]
-
-			tmpEq = self.__getNext(s, '=')
-			if tmpEq == -1:
-				raise TypeError('Input is NOT tableconstructor!')
-			s = s[tmpEq + 1:]
-
-			
-			tmpEnd = self.__getNext(s, ',')
-			
-			tmpValue = []
-			if tmpEnd == -1:
-				tmpValue = self.__getValue(s[tmpEq+1:])
-			else:
-				tmpValue = self.__getValue(s[tmpEq+1:tmpEnd])
-			
-			print tmpValue
-		else:#other 2 cont
-			pass
-
-
-	def __isTableCons(self, s):
-		'''see s is table constructor or not'''
-		tmps = self.__cutHeadTail(s)
-		if tmps[0] == '{' and tmps[-1] == '}':
-			return True
-		else:
-			return False
-
-	def __isStr(self, s):
-		'''see s is string or not'''
-		if isinstance(s, str):
-			return True
-		else:
-			return False
-
-	def __cutHeadTail(self, s):
-		'''cut the head and tail of s where is whitespace, '\t', '\n'''
-		#rm whitespace
-		s = s.lstrip().rstrip()
-		spaceList = ('\t', '\n')
-		#rm head
-		while s[0] in spaceList:
-			del s[0]
-		#rm tail
-		while s[-1] in spaceList:
-			del s[-1]	
-		return s
-
-
-
-
-
-tPy = PyLuaTblParser()
-tPy._luaParse('  \t   \n\n{  [ "av"  ] = abc 	}  \n  \t\t')
