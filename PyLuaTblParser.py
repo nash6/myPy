@@ -34,8 +34,7 @@ class PyLuaTblParser(object):
 		'''
 		self._lex()
 
-		print self.pyDict
-		print self.pyList
+		
 
 	def dump(self):
 		pass
@@ -99,12 +98,41 @@ class PyLuaTblParser(object):
 			elif self.luaTblContent[self.curr] in (',', ';'):
 				self._store()
 				self._next()
-			elif self.luaTblContent[self.curr] == '[':
-				if self.stat == 0:
-					self.stat = -1
+			elif self.luaTblContent[self.curr] == '[':#[=[ or [key]
+				if self._checkNext('=['):
 					self._next()
-				else:
-					raise TypeError('Extra [ %s', self.curr)
+					eqC = 0
+					while self.luaTblContent[self.curr] == '=':
+						eqC += 1
+						if not self._next():
+							raise TypeError('Extra [= or [[ %s', self.curr)
+
+					if self.luaTblContent[self.curr] != '[':
+						raise TypeError('Extra [=[ or [[ %s', self.curr)
+
+					pat = ']' + '=' * eqC + ']'
+					
+					ret = self.luaTblContent.find(pat, self.curr + 1)
+					if ret == -1:
+						raise TypeError('No match %s %s'%(pat,self.curr))
+
+					tmpstr = self.luaTblContent[self.curr + 1: ret]
+				
+					if tmpstr[:2] == r'\n':
+						tmpstr = tmpstr[2:]
+					self.curr = ret + len(pat) 
+					
+
+					if self.stat == 0:
+						self.tmpKey = tmpstr
+						self.stat = 3
+
+				else: 
+					if self.stat == 0:
+						self.stat = -1
+						self._next()
+					else:
+						raise TypeError('Extra [ %s', self.curr)
 
 			elif self.luaTblContent[self.curr] == '{':
 				if self.stat not in (-2, 0):
@@ -200,15 +228,16 @@ class PyLuaTblParser(object):
 	def _checkNext(self, pat):
 		if self.curr + 1 >= len(self.luaTblContent):
 			return False
-		if self.luaTblContent[self.curr] in pat:
+		if self.luaTblContent[self.curr + 1] in pat:
 			return True
 		else:
 			return False
 	
 if __name__ == '__main__':
 	tPy = PyLuaTblParser()
-	a = '{["abc"] = "123", ["456"] = {["12"] = "21","abc"} }'
+	a = r'{["abc"] = "123", ["456"] = {["12"] = "21","abc"}, [[\n1245]] }'
 	tPy.load(a)
 	
 	print tPy.pyDict
+	print tPy.pyList
 
