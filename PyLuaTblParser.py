@@ -31,7 +31,6 @@ class PyLuaTblParser(object):
 		self.curr = 0
 		self.stat = 0
 		self.negative = False
-		self.longCom = False
 		self.decimal = False
 		self.tmpKey = None
 		self.tmpVal = None
@@ -49,26 +48,16 @@ class PyLuaTblParser(object):
 		
 
 	def dump(self):
-		result = ''
-		if len(self.pyDict) == 0:
-			result += '{'
-			for each in self.pyList:
-				if each == None:
-					result += 'nil, '
-				else:
-					result += str(each)
-					result += ', '
-			result += '}'
-		else:
-			d = self.dumpDict()
-			result = self._dict2lua(d)
+	
+		d = self.dumpDict()
+		result = self._dict2lua(d)
 		return result
 
 	def loadLuaTable(self, f):
 		fp = open(f, 'r')
 		tmpstr = ''
 		for item in fp:
-			tmpstr += item
+			tmpstr += str(item)
 		fp.close()
 		self.load(tmpstr)
 
@@ -79,6 +68,8 @@ class PyLuaTblParser(object):
 		fp.close()
 
 	def loadDict(self, d):
+		self.pyDict = {}
+		self.pyList = []
 		myd = self.deepCopyDict(d)
 		for key in myd:
 			if isinstance(key, str) or isinstance(key, int) or isinstance(key, float):
@@ -86,12 +77,11 @@ class PyLuaTblParser(object):
 
 
 	def dumpDict(self):
-		if len(self.pyDict) == 0:
-			return self.pyList[:]
-		else:
-			for index, each in enumerate(self.pyList):
-				self.pyDict[index + 1] = each	
-			return self.deepCopyDict(self.pyDict)
+		'''
+		
+		'''
+		self._list2Dict()
+		return self.deepCopyDict(self.pyDict)
 
 	#private fun
 	def _lex(self):
@@ -114,7 +104,8 @@ class PyLuaTblParser(object):
 
 					if self.curr >= len(self.luaTblContent):
 						raise TypeError('stat -1 no ] %s', self.curr)
-		
+
+
 					while(self.luaTblContent[self.curr] != ']'):
 						if self.luaTblContent[self.curr] not in spaces:
 							raise TypeError('extra char  %s', self.curr)
@@ -140,39 +131,32 @@ class PyLuaTblParser(object):
 					raise TypeError('Extra = %s', self.curr)
 
 			elif self.luaTblContent[self.curr] in (',', ';'):
+				if self.stat in (-2, -1, 0):
+					raise TypeError(" ", self.stat)
 				self._store()
 				self._next()
 
 			elif self.luaTblContent[self.curr] == '[':#[=[ or [key]
 				if self._checkNext('=['):
 					self._next()
-					eqC = 0
-					while self.luaTblContent[self.curr] == '=':
-						eqC += 1
-						if not self._next():
-							raise TypeError('Extra [= or [[ %s', self.curr)
 
-					if self.luaTblContent[self.curr] != '[':
-						raise TypeError('Extra [=[ or [[ %s', self.curr)
+					tmpstr = self._longBrackets()
 
-					pat = ']' + '=' * eqC + ']'
-					
-					ret = self.luaTblContent.find(pat, self.curr + 1)
-					if ret == -1:
-						raise TypeError('No match %s %s'%(pat,self.curr))
-
-					tmpstr = self.luaTblContent[self.curr + 1: ret]
-				
-					if tmpstr[0] == '\n':
-						tmpstr = tmpstr[1:]
-					self.curr = ret + len(pat) 
-					
-					if not self.longCom:
-						if self.stat == 0:
-							self.tmpKey = tmpstr
-							self.stat = 3
-						else:
-							raise TypeError('Extra [[str]]'%(self.curr))
+					if tmpstr == None:
+						raise TypeError('[=[ long string has no [')
+									
+					if self.stat == 0:
+						self.tmpKey = tmpstr
+						self.stat = 3
+					elif self.stat == -1:
+						self.tmpKey = tmpstr
+						self._findRhs()
+						self.stat = 1
+					elif self.stat == -2:
+						self.tmpVal = tmpstr
+						self.stat = 2
+					else:
+						raise TypeError('Extra [[str]]'%(self.curr))
 				else: 
 					if self.stat == 0:
 						self.stat = -1
@@ -183,68 +167,53 @@ class PyLuaTblParser(object):
 			elif self.luaTblContent[self.curr] == '{':
 				if self.stat not in (-2, 0):
 					raise TypeError('Error { %s', self.curr)
-
-				stack = []
+				lhc = 0
 				begin = self.curr
-
 				if not self._next():
 					raise TypeError('No match for { %s', self.curr)
 				
 				while True:
-					if self.luaTblContent[self.curr] == '}' and len(stack) == 0:
-						break
-
-					if self.luaTblContent[self.curr] in ('\'', '\"') and self.luaTblContent[self.curr -1 ] != '\\':
-						if len(stack) == 0:
-							stack.append(self.luaTblContent[self.curr])
-						elif stack[-1] == self.luaTblContent[self.curr]:
-							stack.pop()
-						elif stack[-1] in ('\'','\"'):
-							pass
-						else:
-							stack.append(self.luaTblContent[self.curr])
-					elif self.luaTblContent[self.curr] == '{':
-						if len(stack) == 0:
-							stack.append(self.luaTblContent[self.curr])
-						elif stack[-1] in ('\'','\"'):
-							pass
-						else:
-							stack.append(self.luaTblContent[self.curr])
-					elif self.luaTblContent[self.curr] == '}':
-						if len(stack) == 0:
-							raise TypeError('U see god')
-						elif stack[-1] in ('\'','\"'):
-							pass
-						elif stack[-1] == '{':
-							stack.pop()
-						else:
-							raise TypeError('U see god')
-					elif self.luaTblContent[self.curr] == '[':
-						if len(stack) != 0 and stack[-1] in ('\'','\"'):
-							pass
-						else:
-							if self._checkNext('=['):
-								self._next()
-								eqC = 0
-								while self.luaTblContent[self.curr] == '=':
-									eqC += 1
-									if not self._next():
-										raise TypeError('Extra [= or [[ %s', self.curr)
-
-								if self.luaTblContent[self.curr] != '[':
-									raise TypeError('Extra [=[ or [[ %s', self.curr)
-
-								pat = ']' + '=' * eqC + ']'
-								
-								ret = self.luaTblContent.find(pat, self.curr + 1)
-								if ret == -1:
-									raise TypeError('No match %s %s'%(pat,self.curr))
-
-								self.curr = ret + pat -1 
-
-					if not self._next():
+					if self.curr >= len(self.luaTblContent):
 						raise TypeError('No match for { %s', self.curr)
 
+					if self.luaTblContent[self.curr] == '}' and lhc == 0:
+						break
+
+					if self.luaTblContent[self.curr] in ('\'', '\"') :
+						self._getStr(self.luaTblContent[self.curr])
+					
+					elif self.luaTblContent[self.curr] == '{':
+						lhc += 1
+						if not self._next():
+							raise TypeError('No match for { %s', self.curr)
+					elif self.luaTblContent[self.curr] == '}' and lhc != 0:						
+						lhc -= 1
+						if not self._next():
+							raise TypeError('No match for { %s', self.curr)
+					elif self.luaTblContent[self.curr] == '[':
+						if self._checkNext('=['):
+							self._next()
+							self._longBrackets()
+						else:
+							if not self._next():
+								raise TypeError('No match for { %s', self.curr)
+					elif self.luaTblContent[self.curr] == '-':
+						if self._checkNext('-'):
+							self._next()#--
+							if self._checkNext('['):
+								self._next()#--[
+								if self._checkNext('=['):
+									self._next()
+									self._longBrackets()
+								else:
+									self._comment()
+							else:
+								self._comment()
+						else:
+							self._next()
+					else:
+						self._next()
+				
 				recur = PyLuaTblParser()
 				recur.load(self.luaTblContent[begin:self.curr+1])
 
@@ -270,7 +239,8 @@ class PyLuaTblParser(object):
 					if self._checkNext('['):
 						self._next()
 						if self._checkNext('=['):
-							self.longCom = True
+							self._next()
+							self._longBrackets()						
 						else:
 							self._comment()
 					else:
@@ -308,7 +278,7 @@ class PyLuaTblParser(object):
 					if self.tmpVal != None:
 						raise TypeError('Already has val in nums %s' % self.curr)
 
-					ret = self.alter(spaces + (',',':'))
+					ret = self.alter(spaces + (',',';'))
 					if ret == -1:
 						strNum = self.luaTblContent[begin:]
 					else:
@@ -321,13 +291,23 @@ class PyLuaTblParser(object):
 						self.stat = 2
 					else:
 						self.tmpKey = realNum
-						self.stat = 3
-				else:
+						self.stat = 3 
+				elif self.stat == 1:
+					print self.luaTblContent
+					raise TypeError('Extra Num %s' % self.curr)
+				elif self.stat == 2:
+					print self.luaTblContent
+					raise TypeError('Extra Num %s' % self.curr)
+				elif self.stat == 3:
+					print self.luaTblContent
+					raise TypeError('Extra Num %s' % self.curr)
+				elif self.stat == 4:
+					print self.luaTblContent
 					raise TypeError('Extra Num %s' % self.curr)
 
 			elif self.luaTblContent[self.curr].isalpha() or self.luaTblContent[self.curr] == '_':
 				begin = self.curr
-				ret = self.alter(spaces + (',',';'))
+				ret = self.alter(spaces + (',',';','='))
 
 				name = ''
 				if ret == -1:
@@ -357,15 +337,28 @@ class PyLuaTblParser(object):
 					else:
 						raise TypeError('Extra T/F %s' % self.curr)
 				else:
-					if self.stat == 0:
-						self.tmpKey = name
-						self.stat = 4
-					else:
+					if self.stat == -2:
+						self.tmpVal = None
+						self.stat = 2
+						#raise TypeError('Extra exp name %s %s' % (name,self.curr))
+					elif self.stat == -1:
 						raise TypeError('Extra exp name %s' % self.curr)
-
-
+					elif self.stat == 0:
+						self.stat = 4
+						self.tmpKey = name
+					elif self.stat == 1:
+						raise TypeError('Extra exp name %s' % self.curr)
+					elif self.stat == 2:
+						raise TypeError('Extra exp name %s' % self.curr)
+					elif self.stat == 3:
+						raise TypeError('Extra exp name %s' % self.curr)
+					elif self.stat == 4:
+						raise TypeError('Extra exp name %s' % self.curr)
+					
 			else:
+				print self.luaTblContent[self.curr]
 				raise TypeError("Oop")
+
 
 	def _store(self):
 		if self.stat == -1:
@@ -391,17 +384,30 @@ class PyLuaTblParser(object):
 			self.stat = 0
 		elif self.stat == 0:
 			pass
+		elif self.stat == 4:
+			self.tmpKey = None
+			self.pyList.append(None)
+			self.stat = 0
 		else:
 			raise TypeError("store stat eror %s "% self.curr)
 
 	def _getStr(self, pat):
+		'''curr to next real char'''
 		if not self._next():
 			raise TypeError('Error in %s: EOF', pat)
-		ret = self.luaTblContent.find(pat, self.curr + 1)
+		ret = self.luaTblContent.find(pat, self.curr )
 		if not ret:
 			raise TypeError('Error in %s: no found', pat)
-		else:
-			while self.luaTblContent[ret - 1] ==  "\\":
+		else:			
+			while True:
+				count = 0
+				pre = ret - 1
+				while pre >= 0 and self.luaTblContent[pre] ==  "\\":
+					count += 1
+					pre -= 1
+			
+				if count % 2 == 0:
+					break
 				ret = self.luaTblContent.find(pat, ret + 1)
 				if ret == -1:
 					raise TypeError('Error in %s: no found', pat)
@@ -426,7 +432,7 @@ class PyLuaTblParser(object):
 
 	def _comment(self):
 		if self._next():
-			while self.luaTblContent[self.curr] not in ('\n', '\r'):
+			while self.luaTblContent[self.curr] not in ('\n'):
 				if not self._next():
 					break
 			else:
@@ -496,32 +502,32 @@ class PyLuaTblParser(object):
 	def _dict2lua(self, d):
 		mystr = '{'
 		for key in d:
+
 			mystr += '['
+
 			if isinstance(key, str):
 				mystr += '"'
-			mystr += str(key)
-			if isinstance(key, str):
-				mystr += '"'
+				tmp = self._strLuaTrans(key)
+				mystr += tmp
+				mystr += '"'			
+			else:#0-9
+				mystr += str(key)
+
 			mystr += ']'
 			mystr += ' = ' 
+
 			if isinstance(d[key] , dict):
 				mystr += self._dict2lua(d[key])
 			elif isinstance(d[key], list):
-				mystr += '{'
-				for each in d[key]:
-					if each == None:
-						mystr += 'nil, '
-					else:
-						mystr += str(each)
-						mystr += ', '
-				mystr += '}'
+				raise TypeError('U see list god')
 			elif d[key] == False:
-				mystr += 'false, '
-			elif d[key] == True:
-				mystr += 'True, '
+				mystr += 'false'
+			elif d[key] == True and d[key] != 1:
+				mystr += 'true'
 			elif isinstance(d[key], str):
 				mystr += '"'
-				mystr += d[key]
+				tmp = self._strLuaTrans(d[key])
+				mystr += tmp
 				mystr += '"'
 			else:
 				mystr += str(d[key])
@@ -529,29 +535,77 @@ class PyLuaTblParser(object):
 		mystr += '}'
 		return mystr
 
+	def _longBrackets(self):
+		'''curr to next real char'''
+		eqC = 0
+		while self.luaTblContent[self.curr] == '=':
+			eqC += 1
+			if not self._next():
+				raise TypeError('Extra [= or [[ %s', self.curr)
+
+		if self.luaTblContent[self.curr] != '[':
+			if self.luaTblContent[self.curr] == '\n':
+				self._next()
+			else:
+				while self.luaTblContent[self.curr] != '\n':
+					if not self._next():
+						break
+				self._next()
+			return None
+
+		else:
+			pat = ']' + '=' * eqC + ']'
+
+			ret = self.luaTblContent.find(pat, self.curr + 1)
+			if ret == -1:
+				raise TypeError('No match %s %s'%(pat,self.curr))
+
+			tmpstr = self.luaTblContent[self.curr + 1: ret]
+			if tmpstr[0] == '\n':
+				tmpstr = tmpstr[1:]
+			self.curr = ret + len(pat) 
+			return tmpstr
+
+	def _list2Dict(self):
+		if len(self.pyList) == 0:
+			return
+		for index, item in enumerate(self.pyList):
+			if item == None:
+				if index in self.pyDict:
+					del self.pyDict[index]
+			else:
+				self.pyDict[index] = item
+
+	def _strLuaTrans(self, s):
+		if not isinstance(s, str):
+			return
+		for index,char in enumerate(s):
+			if char == '"' and self._isReal(index, s):
+				s = s[:index] + '\\' + s[index:]
+		return s
+	
+	def _isReal(self, index, s):
+		if s[index] != '"':
+			raise TypeError('isReal input "')
 		
+		count = 0
+		pre = index - 1
+		while pre >= 0 and s[pre] ==  "\\":
+			count += 1
+			pre -= 1
+		
+		if count % 2 == 0:
+			return True
+
+		return False
+
+
 if __name__ == '__main__':
-	a1 = PyLuaTblParser()
-	a2 = PyLuaTblParser()
-	a3 = PyLuaTblParser()
-
-	file_path = r'C:\Users\S6\Desktop\output.txt'
-
-	test_str = '{array = {65,23,5,},dict = {mixed = {43,54.33,false,9,string = "value",},array = {3,6,4,},string = "value",},}'
-	a1.load(test_str)
-	print a1
-	'''
-	d1 = a1.dumpDict()
-	print d1
-
-	a2.loadDict(d1)
 	
-	
-	a2.dumpLuaTable(file_path)
-	
-	a3.loadLuaTable(file_path)
 
-	d3 = a3.dumpDict()
- 	print d3
- 	'''
+	print 'Hello World'
+	
+		
+	
+
 
