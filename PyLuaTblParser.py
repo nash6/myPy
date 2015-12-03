@@ -35,10 +35,9 @@ class PyLuaTblParser(object):
 		-2 wait for val when left is =
 		-1 wait for key when left is [
 		0 normal
-		1 has a key
-		2 has key and val
-		3 has 'str' list next should be ,;
-		4 exp name next should be =
+		0.5
+		1
+		2
 		'''
 		self._lex()
 
@@ -85,20 +84,26 @@ class PyLuaTblParser(object):
 		spaces = ('\t', ' ', '\n', '\r', '\f', '\v')
 		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9')
 		while True:
-			if self.curr >= len(self.luaTblContent):
+			if self._overRange():
 				self._store()
 				break
 
 			if self.luaTblContent[self.curr] in spaces:
 				self._next()
-
+			elif self.luaTblContent[self.curr] == ']':
+				if self.stat == 0.5:
+					self.stat = 1
+					self._next()
+				else:
+					raise TypeError('Extra ]')
 			elif self.luaTblContent[self.curr] in ('\'','\"'):
 				if self.stat == 0:
 					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
-					self.stat = 3
+					self.stat = 2
 				elif self.stat == -1:
 					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
-					self._findRhs()
+					self.stat = 0.5
+					#self._findRhs()
 				elif self.stat == -2:
 					self.tmpVal = self._getStr(self.luaTblContent[self.curr])
 					self.stat = 2
@@ -109,16 +114,14 @@ class PyLuaTblParser(object):
 				if self.stat == 1:
 					self.stat = -2
 					self._next()
-				elif self.stat == 4:
-					self.stat = -2
-					self._next()
 				else:
 					raise TypeError('Extra = %s', self.curr)
 
 			elif self.luaTblContent[self.curr] in (',', ';'):
-				if self.stat in (-2, -1, 0):
+				if self.stat != 2:
 					raise TypeError(" ", self.stat)
 				self._store()
+				self.stat = 0
 				self._next()
 
 			elif self.luaTblContent[self.curr] == '[':#[=[ or [key]
@@ -132,11 +135,11 @@ class PyLuaTblParser(object):
 									
 					if self.stat == 0:
 						self.tmpKey = tmpstr
-						self.stat = 3
+						self.stat = 2
 					elif self.stat == -1:
 						self.tmpKey = tmpstr
-						self._findRhs()
-						self.stat = 1
+						#self._findRhs()
+						self.stat = 0.5
 					elif self.stat == -2:
 						self.tmpVal = tmpstr
 						self.stat = 2
@@ -158,7 +161,7 @@ class PyLuaTblParser(object):
 					raise TypeError('No match for { %s', self.curr)
 				
 				while True:
-					if self.curr >= len(self.luaTblContent):
+					if self._overRange():
 						raise TypeError('No match for { %s', self.curr)
 
 					if self.luaTblContent[self.curr] == '}' and lhc == 0:
@@ -202,12 +205,12 @@ class PyLuaTblParser(object):
 				recur = PyLuaTblParser()
 				recur.load(self.luaTblContent[begin:self.curr+1])
 
+	
 				if self.stat == 0:
-					self.tmpKey = recur.dumpDict()
-					self.stat = 3
-				elif self.stat == -2:
-					self.tmpVal = recur.dumpDict()
-					self.stat = 2
+					self.tmpKey = recur.dumpDict()	
+				else:
+					self.tmpVal = recur.dumpDict()	
+				self.stat = 2
 				self._next()
 
 			elif self.luaTblContent[self.curr] == '.': #num
@@ -237,11 +240,6 @@ class PyLuaTblParser(object):
 					else:
 						raise TypeError('Extra - %s' % self.curr)
 
-			elif self.luaTblContent[self.curr] == '+':
-				#if self.stat not in (-2, -1):
-				raise TypeError('Extra + %s' % self.curr)
-				#self._next()
-
 			elif self.luaTblContent[self.curr] in nums:
 				begin = self.curr
 				if self.stat == -1:
@@ -256,8 +254,9 @@ class PyLuaTblParser(object):
 					
 					realNum = self.str2Num(strNum, begin)
 
-					self.tmpKey = realNum					
-					self._findRhs()
+					self.tmpKey = realNum
+					
+					self.stat = 0.5
 
 				elif self.stat == -2 or self.stat == 0:
 					if self.tmpVal != None:
@@ -273,17 +272,15 @@ class PyLuaTblParser(object):
 
 					if self.stat == -2:
 						self.tmpVal = realNum
-						self.stat = 2
 					else:
 						self.tmpKey = realNum
-						self.stat = 3 
+					self.stat = 2
+					
 				elif self.stat == 1:
 					raise TypeError('Extra Num %s' % self.curr)
 				elif self.stat == 2:
 					raise TypeError('Extra Num %s' % self.curr)
-				elif self.stat == 3:
-					raise TypeError('Extra Num %s' % self.curr)
-				elif self.stat == 4:
+				elif self.stat == 0.5:
 					raise TypeError('Extra Num %s' % self.curr)
 
 			elif self.luaTblContent[self.curr].isalpha() or self.luaTblContent[self.curr] == '_':
@@ -299,7 +296,8 @@ class PyLuaTblParser(object):
 				if name == 'nil':
 					if self.stat == 0:
 						self.tmpKey = None
-						self.stat = 3
+						self.tmpVal = 'nil'
+						self.stat = 2
 					elif self.stat == -2:
 						self.tmpVal = None
 						self.stat = 2
@@ -311,7 +309,7 @@ class PyLuaTblParser(object):
 						tmp = False
 					if self.stat == 0:
 						self.tmpKey = tmp
-						self.stat = 3
+						self.stat = 2
 					elif self.stat == -2:
 						self.tmpVal = tmp
 						self.stat = 2
@@ -319,31 +317,28 @@ class PyLuaTblParser(object):
 						raise TypeError('Extra T/F %s' % self.curr)
 				else:
 					if self.stat == -2:
-						self.tmpVal = None
-						self.stat = 2
-						#raise TypeError('Extra exp name %s %s' % (name,self.curr))
+						raise TypeError('Extra exp name %s %s' % (name,self.curr))
 					elif self.stat == -1:
 						raise TypeError('Extra exp name %s' % self.luaTblContent)
 					elif self.stat == 0:
-						self.stat = 4
+						self.stat = 1
+						print name
 						self.tmpKey = name
+					elif self.stat == 0.5:
+						raise TypeError('Extra exp name %s' % self.curr)
 					elif self.stat == 1:
 						raise TypeError('Extra exp name %s' % self.curr)
 					elif self.stat == 2:
 						raise TypeError('Extra exp name %s' % self.curr)
-					elif self.stat == 3:
-						raise TypeError('Extra exp name %s' % self.curr)
-					elif self.stat == 4:
-						raise TypeError('Extra exp name %s' % self.curr)
-					
 			else:
 				#print self.curr
 				raise TypeError("Oop %d %s" % (self.curr, self.luaTblContent[self.curr]))
 
 
 	def _store(self):
-		if self.stat == -1:
+		if self.stat in (-1,0.5,1,-2):
 			raise TypeError("Wait for Key %s", self.curr)
+		'''
 		elif self.stat == -2:
 			raise TypeError("Wait for Val %s", self.curr)
 		elif self.stat == 1 or self.stat == 3:
@@ -352,26 +347,29 @@ class PyLuaTblParser(object):
 			self.pyList.append(self.tmpKey)
 			self.tmpKey = None
 			self.stat = 0
-		elif self.stat == 2:
-			if self.tmpKey == None:
+		'''
+		if self.stat == 2:
+			if self.tmpKey == None and self.tmpVal == None:
 				raise TypeError('No tmpKey when stat 2 %s', self.curr)
+		elif self.stat == 0:
+			if self.tmpKey == None and self.tmpVal == None:
+				return 0
+		else:
+			raise TypeError('Store when error stat %s', self.curr)
+
+		if self.tmpKey == None:
+			if self.tmpVal == 'nil':
+				self.pyList.append(None)
+			else:
+				raise TypeError('key none')
+		else:
 			if self.tmpVal == None:
-				#raise TypeError('No tmpVal when stat 2 %s', self.curr)
-				if self.tmpKey in self.pyDict:
-					del self.pyDict[self.tmpKey]
+				self.pyList.append(self.tmpKey)
 			else:
 				self.pyDict[self.tmpKey] = self.tmpVal
-			self.tmpKey = None
-			self.tmpVal = None
-			self.stat = 0
-		elif self.stat == 0:
-			pass
-		elif self.stat == 4:
-			self.tmpKey = None
-			self.pyList.append(None)
-			self.stat = 0
-		else:
-			raise TypeError("store stat eror %s "% self.curr)
+
+		self.tmpKey = None
+		self.tmpVal = None
 
 	def _getStr(self, pat):
 		'''curr to next real char'''
@@ -399,7 +397,7 @@ class PyLuaTblParser(object):
 
 	def _next(self):
 		self.curr += 1
-		if self.curr >= len(self.luaTblContent):
+		if self._overRange():
 			return False
 		else:
 			return True
@@ -422,7 +420,7 @@ class PyLuaTblParser(object):
 
 	def _findRhs(self):
 		spaces = ('\t', ' ', '\n', '\r', '\f', '\v')
-		if self.curr >= len(self.luaTblContent):
+		if self._overRange():
 			raise TypeError('stat -1 no ] %s', self.curr)
 
 
@@ -450,7 +448,7 @@ class PyLuaTblParser(object):
 				if self.luaTblContent[self.curr] not in spaces:
 					raise TypeError('extra char  %s', self.curr)
 				self._next()
-				if self.curr >= len(self.luaTblContent):
+				if self._overRange():
 					raise TypeError('stat -1 no ] %s', self.curr)
 		self.stat = 4
 		self._next()	
@@ -677,10 +675,12 @@ class PyLuaTblParser(object):
 				index += 1
 		return result
 
-	def cutHeadTail(self, s):
-		if s[0] != '{':
-			pass
-
+	
+	def _overRange(self):
+		if self.curr >= len(self.luaTblContent):
+			return True
+		else:
+			return False
 		
 if __name__ == '__main__':
 	

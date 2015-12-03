@@ -16,6 +16,7 @@ if __name__ == '__main__':
 
 
 	#inside {}
+	testCase.append('{1,2,3}')
 	testCase.append('{{--[=\n1}}')
 	testCase.append('{{[=[abc]=]}}')
 	testCase.append('{1, {--[=[}]=]2}}')
@@ -39,7 +40,7 @@ if __name__ == '__main__':
 
 	testCase.append("{123;456}")
 
-	testCase.append("{[1]=abc}")
+	testCase.append("{[1]=nil}")
 
 	testCase.append("{[00.00]=1, [1] = 2}")
 
@@ -67,13 +68,13 @@ if __name__ == '__main__':
 
 	testCase.append('{[--awd\n-2.e-1--daw\n] = 6,[--[=[d\n2123]=]-.2e-1--[[daw\n]]]=7}')
 
-	testCase.append('{[2]}')
+	testCase.append('{[1]=1,[2]=2,[3]=3}')
 	#testCase.append('--sdwa\n{_sdaw" = 1}--[=[\n]=]')
 
 	#testCase.append('{[[1\n1]],"1\n1"}')
 
-
 	'''
+	
 	fp = open(r'C:\Users\S6\Desktop\new1.txt')
 	tmp = ''
 	for line in fp:
