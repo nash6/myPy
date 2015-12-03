@@ -9,11 +9,8 @@ class PyLuaTblParser(object):
 		self.pyDict = {}
 		self.pyList = []
 
-		
-
 	def load(self, s):
 		'''load Lua table'''
-
 		self.pyDict = {}
 		self.pyList = []
 		if not isinstance(s, str):
@@ -455,7 +452,7 @@ class PyLuaTblParser(object):
 				self._next()
 				if self.curr >= len(self.luaTblContent):
 					raise TypeError('stat -1 no ] %s', self.curr)
-		self.stat = 1
+		self.stat = 4
 		self._next()	
 	
 	def str2Num(self, strNum, begin):
@@ -492,8 +489,16 @@ class PyLuaTblParser(object):
 				self.negative = False
 
 			if 'e' in strNum or '.' in strNum:
+				iinums = ('0', '1', '2', '3', '4', '5', '6','7','8','9','e','E','.','-','+')
+				for each in strNum:
+					if each not in iinums:
+						raise TypeError('%s', strNum)
 				return float(strNum)
 			else:
+				iinums = ('0', '1', '2', '3', '4', '5', '6','7','8','9','e','E','.','-')
+				for each in strNum:
+					if each not in iinums:
+						raise TypeError('dwadw')
 				return int(strNum)
 
 	def alter(self, tup):
@@ -507,7 +512,7 @@ class PyLuaTblParser(object):
 	def alterNum(self):
 		if self.curr > len(self.luaTblContent):
 			return -1
-		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9','e','E','p','P','.','x','X','-')
+		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9','e','E','p','P','.','x','X','-','+')
 		nums += ('a','A','b','B','c','C','D','d','e','E','f','F')
 		while self.luaTblContent[self.curr] in nums:
 			if self.luaTblContent[self.curr] == '-':
@@ -672,7 +677,11 @@ class PyLuaTblParser(object):
 				index += 1
 		return result
 
+	def cutHeadTail(self, s):
+		if s[0] != '{':
+			pass
 
+		
 if __name__ == '__main__':
 	
 	print 'Hello World'

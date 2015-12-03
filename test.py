@@ -61,11 +61,17 @@ if __name__ == '__main__':
 
 	testCase.append('{1,2,3,nil,5,[99] = 1,[99] = nil}')
 
-	testCase.append('{-.1e-2, .1e-2, -0x2}')
+	testCase.append('{-.1e-2, .1e-2, -0x2,--[[1]]1.e-1, 1.e+1}')
 
 	testCase.append(r'''{["'\\"] = 1}''')
 
 	testCase.append('{[--awd\n-2.e-1--daw\n] = 6,[--[=[d\n2123]=]-.2e-1--[[daw\n]]]=7}')
+
+	testCase.append('{[2]}')
+	#testCase.append('--sdwa\n{_sdaw" = 1}--[=[\n]=]')
+
+	#testCase.append('{[[1\n1]],"1\n1"}')
+
 
 	'''
 	fp = open(r'C:\Users\S6\Desktop\new1.txt')
