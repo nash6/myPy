@@ -101,19 +101,7 @@ class PyLuaTblParser(object):
 					self.stat = 3
 				elif self.stat == -1:
 					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
-
-					if self.curr >= len(self.luaTblContent):
-						raise TypeError('stat -1 no ] %s', self.curr)
-
-
-					while(self.luaTblContent[self.curr] != ']'):
-						if self.luaTblContent[self.curr] not in spaces:
-							raise TypeError('extra char  %s', self.curr)
-						self._next()
-						if self.curr >= len(self.luaTblContent):
-							raise TypeError('stat -1 no ] %s', self.curr)
-					self.stat = 1
-					self._next()	
+					self._findRhs()
 				elif self.stat == -2:
 					self.tmpVal = self._getStr(self.luaTblContent[self.curr])
 					self.stat = 2
@@ -263,7 +251,7 @@ class PyLuaTblParser(object):
 					if self.tmpKey != None:
 						raise TypeError('Already has key in [  when read nums %s' % self.curr)
 
-					ret = self.alter(spaces +(']',))
+					ret = self.alterNum()
 					if ret == -1:
 						raise TypeError('Extra Num %s' % self.curr)
 					
@@ -278,14 +266,14 @@ class PyLuaTblParser(object):
 					if self.tmpVal != None:
 						raise TypeError('Already has val in nums %s' % self.curr)
 
-					ret = self.alter(spaces + (',',';'))
+					ret = self.alterNum()
 					if ret == -1:
 						strNum = self.luaTblContent[begin:]
 					else:
 						strNum = self.luaTblContent[begin:self.curr]
 
 					realNum = self.str2Num(strNum, begin)
-					
+
 					if self.stat == -2:
 						self.tmpVal = realNum
 						self.stat = 2
@@ -338,7 +326,7 @@ class PyLuaTblParser(object):
 						self.stat = 2
 						#raise TypeError('Extra exp name %s %s' % (name,self.curr))
 					elif self.stat == -1:
-						raise TypeError('Extra exp name %s' % self.curr)
+						raise TypeError('Extra exp name %s' % self.luaTblContent)
 					elif self.stat == 0:
 						self.stat = 4
 						self.tmpKey = name
@@ -352,8 +340,8 @@ class PyLuaTblParser(object):
 						raise TypeError('Extra exp name %s' % self.curr)
 					
 			else:
-				print self.luaTblContent[self.curr]
-				raise TypeError("Oop")
+				#print self.curr
+				raise TypeError("Oop %d %s" % (self.curr, self.luaTblContent[self.curr]))
 
 
 	def _store(self):
@@ -439,13 +427,34 @@ class PyLuaTblParser(object):
 		spaces = ('\t', ' ', '\n', '\r', '\f', '\v')
 		if self.curr >= len(self.luaTblContent):
 			raise TypeError('stat -1 no ] %s', self.curr)
-		
-		while(self.luaTblContent[self.curr] != ']'):
-			if self.luaTblContent[self.curr] not in spaces:
-				raise TypeError('extra char  %s', self.curr)
-			self._next()
-			if self.curr >= len(self.luaTblContent):
+
+
+		while self.luaTblContent[self.curr] in spaces:
+			if not self._next():
 				raise TypeError('stat -1 no ] %s', self.curr)
+
+
+		if self.luaTblContent[self.curr] == '-':
+			if self._checkNext('-'):
+				self._next()#--
+				if self._checkNext('['):
+					self._next()#--[
+					if self._checkNext('=['):
+						self._next()
+						self._longBrackets()
+					else:
+						self._comment()
+				else:
+					self._comment()
+			else:
+				raise TypeError('stat -1 no ] %s', self.curr)
+		else:
+			while(self.luaTblContent[self.curr] != ']'):
+				if self.luaTblContent[self.curr] not in spaces:
+					raise TypeError('extra char  %s', self.curr)
+				self._next()
+				if self.curr >= len(self.luaTblContent):
+					raise TypeError('stat -1 no ] %s', self.curr)
 		self.stat = 1
 		self._next()	
 	
@@ -469,10 +478,10 @@ class PyLuaTblParser(object):
 				strNum = '-' + strNum
 				self.negative = False
 
-			if '.' not in strNum and 'p' not in strNum and 'P' not in strNum:
+			if '.' not in strNum and 'e' not in strNum and 'E' not in strNum and 'p' not in strNum and 'P' not in strNum:
 				return int(strNum, 16)
 			else:#0x.pP
-				raise TypeError('0x.................')
+				raise TypeError('0x.................%s' % strNum)
 			
 		else:
 			if self.decimal:	
@@ -480,7 +489,7 @@ class PyLuaTblParser(object):
 				self.decimal = False
 			if self.negative:
 				strNum = '-' + strNum
-				self.negative = True
+				self.negative = False
 
 			if 'e' in strNum or '.' in strNum:
 				return float(strNum)
@@ -491,6 +500,19 @@ class PyLuaTblParser(object):
 		if self.curr > len(self.luaTblContent):
 			return -1
 		while self.luaTblContent[self.curr] not in tup:
+			if not self._next():
+				return -1
+		return 0
+
+	def alterNum(self):
+		if self.curr > len(self.luaTblContent):
+			return -1
+		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9','e','E','p','P','.','x','X','-')
+		nums += ('a','A','b','B','c','C','D','d','e','E','f','F')
+		while self.luaTblContent[self.curr] in nums:
+			if self.luaTblContent[self.curr] == '-':
+				if self._checkNext('-'):
+					return 0
 			if not self._next():
 				return -1
 		return 0
@@ -534,6 +556,8 @@ class PyLuaTblParser(object):
 				tmp = self._strLuaTrans(d[key])
 				mystr += tmp
 				mystr += '"'
+			elif d[key] == None:
+				mystr += 'nil'
 			else:
 				mystr += str(d[key])
 			mystr += ', '
@@ -650,7 +674,7 @@ class PyLuaTblParser(object):
 
 
 if __name__ == '__main__':
-	print (r'\01')
+	
 	print 'Hello World'
 	
 		
