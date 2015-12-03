@@ -41,6 +41,21 @@ if __name__ == '__main__':
 
 	testCase.append("{[1]=abc}")
 
+	testCase.append("{[00.00]=1, [1] = 2}")
+
+	testCase.append("{[0x1e1]=1}")
+
+	testCase.append("{[11]='abc', [-0x2]=-0xa, [-11] = 5}")
+
+	testCase.append('{[==[\nalo\n123"]==]}')
+
+	testCase.append("{'alo\010123\"'}")
+
+	testCase.append("{1,2,3,--[===\n 123}")
+
+	testCase.append(r'''{'\\\97lo\10\04923"', [==[\97lo\10\04923"]==], 'ug\97\000123'}''')
+
+	testCase.append('{[11] = 11, nil, 3,[-11.] = "abc", [-11] = "v", [-0xb] = nil}')
 
 	for index, each in enumerate(testCase):
 		print index, ': len' ,len(each)
@@ -51,7 +66,10 @@ if __name__ == '__main__':
 		a3 = PyLuaTblParser()
 		
 		a1.load(each)
+		print a1.pyDict
+		print a1.pyList
 		d1 = a1.dumpDict()
+		print d1
 		
 		a2.loadDict(d1)		
 		a2.dumpLuaTable(file_path)

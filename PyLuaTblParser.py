@@ -240,7 +240,7 @@ class PyLuaTblParser(object):
 						self._next()
 						if self._checkNext('=['):
 							self._next()
-							self._longBrackets()						
+							ret = self._longBrackets()			
 						else:
 							self._comment()
 					else:
@@ -253,9 +253,9 @@ class PyLuaTblParser(object):
 						raise TypeError('Extra - %s' % self.curr)
 
 			elif self.luaTblContent[self.curr] == '+':
-				if self.stat not in (-2, -1):
-					raise TypeError('Extra + %s' % self.curr)
-				self._next()
+				#if self.stat not in (-2, -1):
+				raise TypeError('Extra + %s' % self.curr)
+				#self._next()
 
 			elif self.luaTblContent[self.curr] in nums:
 				begin = self.curr
@@ -293,16 +293,12 @@ class PyLuaTblParser(object):
 						self.tmpKey = realNum
 						self.stat = 3 
 				elif self.stat == 1:
-					print self.luaTblContent
 					raise TypeError('Extra Num %s' % self.curr)
 				elif self.stat == 2:
-					print self.luaTblContent
 					raise TypeError('Extra Num %s' % self.curr)
 				elif self.stat == 3:
-					print self.luaTblContent
 					raise TypeError('Extra Num %s' % self.curr)
 				elif self.stat == 4:
-					print self.luaTblContent
 					raise TypeError('Extra Num %s' % self.curr)
 
 			elif self.luaTblContent[self.curr].isalpha() or self.luaTblContent[self.curr] == '_':
@@ -376,7 +372,8 @@ class PyLuaTblParser(object):
 				raise TypeError('No tmpKey when stat 2 %s', self.curr)
 			if self.tmpVal == None:
 				#raise TypeError('No tmpVal when stat 2 %s', self.curr)
-				pass
+				if self.tmpKey in self.pyDict:
+					del self.pyDict[self.tmpKey]
 			else:
 				self.pyDict[self.tmpKey] = self.tmpVal
 			self.tmpKey = None
@@ -413,7 +410,7 @@ class PyLuaTblParser(object):
 					raise TypeError('Error in %s: no found', pat)
 			ocurr = self.curr
 			self.curr = ret + 1	
-			return self.luaTblContent[ocurr:ret]
+			return self._transAscii(self.luaTblContent[ocurr:ret])
 
 	def _next(self):
 		self.curr += 1
@@ -462,20 +459,28 @@ class PyLuaTblParser(object):
 
 
 		if strNum[0] == '0' and len(strNum) > 1 and strNum[1] in 'Xx':
+			if len(strNum) == 2:
+				raise TypeError('Error only 0x %s' % self.curr)
+
 			if self.decimal:
 				raise TypeError('Error .0x %s' % self.curr)
+
 			if self.negative:
 				strNum = '-' + strNum
-			if '.' not in strNum:
+				self.negative = False
+
+			if '.' not in strNum and 'p' not in strNum and 'P' not in strNum:
 				return int(strNum, 16)
-			else:
-				 raise TypeError('0x.................')
+			else:#0x.pP
+				raise TypeError('0x.................')
 			
 		else:
-			if self.decimal:
+			if self.decimal:	
 				strNum = '0.' + strNum
+				self.decimal = False
 			if self.negative:
 				strNum = '-' + strNum
+				self.negative = True
 
 			if 'e' in strNum or '.' in strNum:
 				return float(strNum)
@@ -541,7 +546,7 @@ class PyLuaTblParser(object):
 		while self.luaTblContent[self.curr] == '=':
 			eqC += 1
 			if not self._next():
-				raise TypeError('Extra [= or [[ %s', self.curr)
+				return None
 
 		if self.luaTblContent[self.curr] != '[':
 			if self.luaTblContent[self.curr] == '\n':
@@ -564,25 +569,32 @@ class PyLuaTblParser(object):
 			if tmpstr[0] == '\n':
 				tmpstr = tmpstr[1:]
 			self.curr = ret + len(pat) 
-			return tmpstr
+			return self._transAscii(tmpstr)
 
 	def _list2Dict(self):
 		if len(self.pyList) == 0:
 			return
 		for index, item in enumerate(self.pyList):
 			if item == None:
+				'''
 				if index in self.pyDict:
 					del self.pyDict[index]
+				'''
+				self.pyDict[index+1] = item
 			else:
-				self.pyDict[index] = item
+				self.pyDict[index+1] = item
 
 	def _strLuaTrans(self, s):
 		if not isinstance(s, str):
-			return
+			raise TypeError('strLuaTrans input is not str"')
+
+		result = ""
 		for index,char in enumerate(s):
 			if char == '"' and self._isReal(index, s):
-				s = s[:index] + '\\' + s[index:]
-		return s
+				result += '\\"'
+			else:
+				result += char
+		return result
 	
 	def _isReal(self, index, s):
 		if s[index] != '"':
@@ -599,10 +611,46 @@ class PyLuaTblParser(object):
 
 		return False
 
+	def _transAscii(self, s):
+		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9')
+		count = 0
+		result = ''
+
+		index = 0
+		while index < (len(s)):
+			if s[index] == '\\':
+				count += 1
+				if count == 2:
+					result += '\\\\'
+					count = 0
+				index += 1
+			elif s[index] in nums:
+				if count == 0:
+					result += s[index]
+					index += 1
+				elif count == 1:
+					numstr = s[index]
+					index += 1
+					if index < len(s) and s[index] in nums:
+						numstr += s[index]
+						index += 1
+						if index < len(s) and s[index] in nums:
+							numstr += s[index]
+							index += 1	
+					if int(numstr) != 0:
+						result += chr(int(numstr))
+					count = 0
+				else:
+					raise TypeError('U see god in _transAscii')
+			else:
+				count = 0
+				result += s[index]
+				index += 1
+		return result
+
 
 if __name__ == '__main__':
-	
-
+	print (r'\01')
 	print 'Hello World'
 	
 		
