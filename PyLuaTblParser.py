@@ -72,8 +72,8 @@ class PyLuaTblParser(object):
 		fp.close()
 
 	def loadDict(self, d):
-		self.pyDict = {}
-		self.pyList = []
+		#self.pyDict = {}
+		#self.pyList = []
 		myd = self.deepCopyDict(d)
 		for key in myd:
 			if isinstance(key, str) or isinstance(key, int) or isinstance(key, float):
@@ -111,7 +111,6 @@ class PyLuaTblParser(object):
 				elif self.stat == -1:
 					self.tmpKey = self._getStr(self.luaTblContent[self.curr])
 					self.stat = 0.5
-					#self._findRhs()
 				elif self.stat == -2:
 					self.tmpVal = self._getStr(self.luaTblContent[self.curr])
 					self.stat = 2
@@ -146,7 +145,6 @@ class PyLuaTblParser(object):
 						self.stat = 2
 					elif self.stat == -1:
 						self.tmpKey = tmpstr
-						#self._findRhs()
 						self.stat = 0.5
 					elif self.stat == -2:
 						self.tmpVal = tmpstr
@@ -189,22 +187,14 @@ class PyLuaTblParser(object):
 					elif self.luaTblContent[self.curr] == '[':
 						if self._checkNext('=['):
 							self._next()
-							self._longBrackets()
+							if self._longBrackets() == None:
+								raise TypeError('{ [ error %s', self.curr)
 						else:
 							if not self._next():
 								raise TypeError('No match for { %s', self.curr)
-					elif self.luaTblContent[self.curr] == '-':
+					elif self.luaTblContent[self.curr] == '-':					
 						if self._checkNext('-'):
-							self._next()#--
-							if self._checkNext('['):
-								self._next()#--[
-								if self._checkNext('=['):
-									self._next()
-									self._longBrackets()
-								else:
-									self._comment()
-							else:
-								self._comment()
+							self._ignoreComment()
 						else:
 							self._next()
 					else:
@@ -222,28 +212,37 @@ class PyLuaTblParser(object):
 				self._next()
 
 			elif self.luaTblContent[self.curr] == '.': #num
+				if self.stat not in (0,-1,-2) or self.decimal == True:
+					raise TypeError('Extra . %s' % self.curr)
+
 				if self._checkNext(str(nums)):
+					if self._checkNext('0'):
+						if self._checkNext('xX'):
+							raise TypeError('.0x %s' % self.curr)
+					if self.decimal == True:
+						raise TypeError('Too many .')
 					self.decimal = True
 					self._next()
 				else:
 					raise TypeError('Extra . %s' % self.curr)
+
 			elif self.luaTblContent[self.curr] == '-':
 				if self._checkNext('-'):				
 					self._ignoreComment()
+				elif self._checkNext('.'+str(nums)):
+					if self.stat not in (0,-1,-2) or self.decimal == True:
+						raise TypeError('Extra . %s' % self.curr)
 
+					if self.negative == True:
+						raise TypeError('Too many -')
+					self.negative = True
+					self._next()
 				else:
-					if self._checkNext('.'+str(nums)):
-						self.negative = True
-						self._next()
-					else:
-						raise TypeError('Extra - %s' % self.curr)
+					raise TypeError('Extra - %s' % self.curr)
 
 			elif self.luaTblContent[self.curr] in nums:
 				begin = self.curr
 				if self.stat == -1:
-					if self.tmpKey != None:
-						raise TypeError('Already has key in [  when read nums %s' % self.curr)
-
 					ret = self.alterNum()
 					if ret == -1:
 						raise TypeError('Extra Num %s' % self.curr)
@@ -257,10 +256,9 @@ class PyLuaTblParser(object):
 					self.stat = 0.5
 
 				elif self.stat == -2 or self.stat == 0:
-					if self.tmpVal != None:
-						raise TypeError('Already has val in nums %s' % self.curr)
-
+		
 					ret = self.alterNum()
+
 					if ret == -1:
 						strNum = self.luaTblContent[begin:]
 					else:
@@ -283,7 +281,12 @@ class PyLuaTblParser(object):
 
 			elif self.luaTblContent[self.curr].isalpha() or self.luaTblContent[self.curr] == '_':
 				begin = self.curr
+
+				
 				ret = self.alter(spaces + (',',';','='))
+
+				
+
 
 				name = ''
 				if ret == -1:
@@ -298,6 +301,7 @@ class PyLuaTblParser(object):
 						self.stat = 2
 					elif self.stat == -2:
 						self.tmpVal = None
+						self.tmpKey = None
 						self.stat = 2
 					else:
 						raise TypeError('Extra nil %s' % self.curr)
@@ -315,6 +319,8 @@ class PyLuaTblParser(object):
 						raise TypeError('Extra T/F %s' % self.curr)
 				else:
 					if self.stat == -2:
+						if not name[0] == '_':
+							raise TypeError()
 						raise TypeError('Extra exp name %s %s' % (name,self.curr))
 					elif self.stat == -1:
 						raise TypeError('Extra exp name %s' % self.luaTblContent)
@@ -346,25 +352,25 @@ class PyLuaTblParser(object):
 			self.tmpKey = None
 			self.stat = 0
 		'''
-		if self.stat == 2:
-			if self.tmpKey == None and self.tmpVal == None:
-				raise TypeError('No tmpKey when stat 2 %s', self.curr)
-		elif self.stat == 0:
-			if self.tmpKey == None and self.tmpVal == None:
-				return 0
-		else:
+		if self.stat not in (0,2):
 			raise TypeError('Store when error stat %s', self.curr)
+
+		if self.stat == 0:
+			if self.tmpKey != None or self.tmpVal != None:
+				raise TypeError('stat 0 has key or val %s', self.curr)
+			return
 
 		if self.tmpKey == None:
 			if self.tmpVal == 'nil':
 				self.pyList.append(None)
 			else:
-				raise TypeError('key none')
+				pass
 		else:
 			if self.tmpVal == None:
 				self.pyList.append(self.tmpKey)
 			else:
 				self.pyDict[self.tmpKey] = self.tmpVal
+		self.stat = 0
 
 		self.tmpKey = None
 		self.tmpVal = None
@@ -390,8 +396,9 @@ class PyLuaTblParser(object):
 				if ret == -1:
 					raise TypeError('Error in %s: no found', pat)
 			ocurr = self.curr
-			self.curr = ret + 1	
-			return self._transAscii(self.luaTblContent[ocurr:ret])
+			self.curr = ret + 1
+			insideStr = self.luaTblContent[ocurr:ret]
+			return self._transAscii(insideStr)
 
 	def _next(self):
 		self.curr += 1
@@ -412,7 +419,7 @@ class PyLuaTblParser(object):
 		if self._next():
 			while self.luaTblContent[self.curr] not in ('\n'):
 				if not self._next():
-					break
+					raise TypeError('--comment no \n')
 			else:
 				self._next()
 
@@ -527,8 +534,16 @@ class PyLuaTblParser(object):
 				result[key] = d[key]
 		return result
 
+	def _2lua(self):
+		mystr = '{'
+		mystr += self._list2lua(self.pyList)
+		mystr += self._dict2lua(self.pyDict)
+		mystr += '}'
+
+		return mystr
 	def _dict2lua(self, d):
 		mystr = '{'
+		
 		for key in d:
 
 			mystr += '['
@@ -548,9 +563,9 @@ class PyLuaTblParser(object):
 				mystr += self._dict2lua(d[key])
 			elif isinstance(d[key], list):
 				raise TypeError('U see list god')
-			elif d[key] == False:
+			elif d[key] == False and isinstance(d[key], bool):
 				mystr += 'false'
-			elif d[key] == True and d[key] != 1:
+			elif d[key] == True and isinstance(d[key], bool):
 				mystr += 'true'
 			elif isinstance(d[key], str):
 				mystr += '"'
@@ -563,6 +578,31 @@ class PyLuaTblParser(object):
 				mystr += str(d[key])
 			mystr += ', '
 		mystr += '}'
+		return mystr
+
+	def _list2lua(self, l):
+		mystr = ''
+		for item in l:
+
+			if isinstance(d[key] , dict):
+				mystr += self._dict2lua(d[key])
+			elif isinstance(d[key], list):
+				raise TypeError('U see list god')
+			elif d[key] == False and isinstance(d[key], bool):
+				mystr += 'false'
+			elif d[key] == True and isinstance(d[key], bool):
+				mystr += 'true'
+			elif isinstance(d[key], str):
+				mystr += '"'
+				tmp = self._strLuaTrans(d[key])
+				mystr += tmp
+				mystr += '"'
+			elif d[key] == None:
+				mystr += 'nil'
+			else:
+				mystr += str(d[key])
+			mystr += ', '
+		#mystr += '}'
 		return mystr
 
 	def _longBrackets(self):
@@ -594,7 +634,7 @@ class PyLuaTblParser(object):
 			if tmpstr[0] == '\n':
 				tmpstr = tmpstr[1:]
 			self.curr = ret + len(pat) 
-			return self._transAscii(tmpstr)
+			return self._transAscii(tmpstr, 1)
 
 	def _list2Dict(self):
 		if len(self.pyList) == 0:
@@ -636,23 +676,55 @@ class PyLuaTblParser(object):
 
 		return False
 
-	def _transAscii(self, s):
+	def _transAscii(self, s, longStr = 0):
+		'''
+		lua str to py str
+		'''
 		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9')
-		count = 0
+		c = 'abfnrtv'
+		char = tuple(c)
+		fool = ('\'','\"')
+
+		pre = False
 		result = ''
 
-		index = 0
-		while index < (len(s)):
-			if s[index] == '\\':
-				count += 1
-				if count == 2:
-					result += '\\\\'
-					count = 0
+		if longStr == 0:
+			index = 0
+			while index < (len(s)):
+				if pre:
+					if s[index] == '\\':
+						result += '\\\\\\\\'							
+					elif s[index] in char:
+						result += '\\\\' + s[index]						
+					elif s[index] in nums:
+						result += '\\\\' + s[index]						
+					elif s[index] in fool:
+						result += s[index]						
+					else:
+						result += '\\\\'
+						result += s[index]
+						#raise TypeError('in short str \\ error')
+					pre = False	
+				else:
+					if s[index] == '\\':
+						pre = True
+					else:
+						result += s[index]
 				index += 1
+			return result
+		else:
+			return s
+
+			'''
+			if s[index] == '\\':
+				if count == 1:
+					result += r'\\'
+					count = 0
+				else:
+					count += 1
 			elif s[index] in nums:
 				if count == 0:
 					result += s[index]
-					index += 1
 				elif count == 1:
 					numstr = s[index]
 					index += 1
@@ -667,11 +739,15 @@ class PyLuaTblParser(object):
 					count = 0
 				else:
 					raise TypeError('U see god in _transAscii')
+			elif s[index] in char:
+				pass
 			else:
-				count = 0
-				result += s[index]
-				index += 1
-		return result
+				if count == 0:
+					result += s[index]
+			
+			index += 1
+			'''
+		
 
 	
 	def _overRange(self):

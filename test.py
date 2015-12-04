@@ -15,9 +15,8 @@ if __name__ == '__main__':
 
 
 
-	#inside {}
-
-
+	#testCase.append(r'''{["'\\"] = 1}''')
+	'''
 	testCase.append('{1,2,3}')
 	testCase.append('{{--[=\n1}}')
 	testCase.append('{{[=[abc]=]}}')
@@ -56,7 +55,7 @@ if __name__ == '__main__':
 
 	testCase.append("{1,2,3,--[===\n 123}")
 
-	testCase.append(r'''{'\\\97lo\10\04923"', [==[\97lo\10\04923"]==], 'ug\97\000123'}''')
+	testCase.append(r"{'\\\97lo\10\04923"', [==[\97lo\10\04923"]==], 'ug\97\000123'}")
 
 	testCase.append('{[11] = 11, nil, 3,[-11.] = "abc", [-11] = "v", [-0xb] = nil}')
 
@@ -66,7 +65,7 @@ if __name__ == '__main__':
 
 	testCase.append('{-.1e-2, .1e-2, -0x2,--[[1]]1.e-1, 1.e+1}')
 
-	testCase.append(r'''{["'\\"] = 1}''')
+	
 
 	testCase.append('{[--awd\n-2.e-1--daw\n] = 6,[--[=[d\n2123]=]-.2e-1--[[daw\n]]]=7}')
 
@@ -76,8 +75,8 @@ if __name__ == '__main__':
 	#testCase.append('--sdwa\n{_sdaw" = 1}--[=[\n]=]')
 
 	#testCase.append('{[[1\n1]],"1\n1"}')
-
-	'''
+	
+	
 	
 	fp = open(r'C:\Users\S6\Desktop\new1.txt')
 	tmp = ''
@@ -107,6 +106,14 @@ if __name__ == '__main__':
 	if d3 == d1:
 		print 'yes'
 	'''
+	
+	testCase.append('''{"abc\\n",'abc\n','\\\"','\\0123','string"','\\\\','string\"',[[\n\r\'\""']],'\\x59'}''')
+	testCase.append('''{1,2,{"\'", {},[[}]], --[==[\n]==]} --\n}''')
+	testCase.append('''{1.2, .3, 0x1,1.e-1--\n, }''')
+	testCase.append('''{--{}\n{"abc\\n", '"a"', _abv = 1 }}''')
+
+	testCase.append('''{1,"string",[4]="string",nil,[5]=nil,true,false}''')
+
 
 	for index, each in enumerate(testCase):
 		print index, ': len' ,len(each)
@@ -123,7 +130,4 @@ if __name__ == '__main__':
 		a2.dumpLuaTable(file_path)
 		a3.loadLuaTable(file_path)
 		d3 = a3.dump()
-		print `d3`
-	
-	
-
+		print d3
