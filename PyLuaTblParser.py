@@ -9,6 +9,9 @@ class PyLuaTblParser(object):
 		self.pyDict = {}
 		self.pyList = []
 
+		self.luaTblContent = ''
+		self.curr = 0
+
 	def load(self, s):
 		'''load Lua table'''
 		self.pyDict = {}
@@ -17,8 +20,13 @@ class PyLuaTblParser(object):
 			raise TypeError('Input is NOT string!')
 
 		s = s.strip()
+
+
+
 		if not (s[0] == '{' and s[-1] == '}'):
 			raise TypeError('Input is NOT tableconstructor!')
+
+
 
 		s = s[1:-1].strip()
 
@@ -220,19 +228,9 @@ class PyLuaTblParser(object):
 				else:
 					raise TypeError('Extra . %s' % self.curr)
 			elif self.luaTblContent[self.curr] == '-':
-				if self._checkNext('-'):
-					self._next()
-					if self.curr + 1 == len(self.luaTblContent):
-						continue
-					if self._checkNext('['):
-						self._next()
-						if self._checkNext('=['):
-							self._next()
-							ret = self._longBrackets()			
-						else:
-							self._comment()
-					else:
-						self._comment()
+				if self._checkNext('-'):				
+					self._ignoreComment()
+
 				else:
 					if self._checkNext('.'+str(nums)):
 						self.negative = True
@@ -568,7 +566,10 @@ class PyLuaTblParser(object):
 		return mystr
 
 	def _longBrackets(self):
-		'''curr to next real char'''
+		'''
+		call this when curr = '[=' or '[['
+		curr to next real char
+		'''
 		eqC = 0
 		while self.luaTblContent[self.curr] == '=':
 			eqC += 1
@@ -579,10 +580,7 @@ class PyLuaTblParser(object):
 			if self.luaTblContent[self.curr] == '\n':
 				self._next()
 			else:
-				while self.luaTblContent[self.curr] != '\n':
-					if not self._next():
-						break
-				self._next()
+				self._comment()
 			return None
 
 		else:
@@ -681,7 +679,49 @@ class PyLuaTblParser(object):
 			return True
 		else:
 			return False
+
+	def _ignoreComment(self):
+		'''
+		call this func only with curr = '-' and next =' -' 
+		finished with curr = next real one or overRange	
+		'''
+		if self.luaTblContent[self.curr] != '-' or not self._checkNext('-'):
+			raise TypeError('Comment begin with no --')
 		
+		self._next()#--
+		if self._checkNext('['):
+			self._next()#--[
+			if self._checkNext('=['):
+				self._next()
+				self._longBrackets()
+			else:
+				self._comment()
+		else:
+			self._comment()
+
+	def _getTbl(self, s):
+		'''
+		s[0] = '{'
+		find '}'
+		'''
+		tmp = PyLuaTblParser()
+		tmp.luaTblContent = s
+		
+		
+		if not tmp._next():
+			raise TypeError('{')
+
+		while tmp.luaTblContent[tmp.curr] in spaces:
+			if not tmp._next():
+				raise TypeError('{')
+
+		if tmp.luaTblContent[tmp.curr] == '-':
+			tmp._ignoreComment()
+		
+
+
+
+
 if __name__ == '__main__':
 	
 	print 'Hello World'

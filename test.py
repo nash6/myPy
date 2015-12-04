@@ -16,6 +16,8 @@ if __name__ == '__main__':
 
 
 	#inside {}
+
+
 	testCase.append('{1,2,3}')
 	testCase.append('{{--[=\n1}}')
 	testCase.append('{{[=[abc]=]}}')
@@ -69,6 +71,8 @@ if __name__ == '__main__':
 	testCase.append('{[--awd\n-2.e-1--daw\n] = 6,[--[=[d\n2123]=]-.2e-1--[[daw\n]]]=7}')
 
 	testCase.append('{[1]=1,[2]=2,[3]=3}')
+
+	testCase.append('{"\\\n\\\t"}')
 	#testCase.append('--sdwa\n{_sdaw" = 1}--[=[\n]=]')
 
 	#testCase.append('{[[1\n1]],"1\n1"}')
@@ -119,7 +123,7 @@ if __name__ == '__main__':
 		a2.dumpLuaTable(file_path)
 		a3.loadLuaTable(file_path)
 		d3 = a3.dump()
-		print d3
+		print `d3`
 	
 	
 
