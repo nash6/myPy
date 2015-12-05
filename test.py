@@ -115,10 +115,12 @@ if __name__ == '__main__':
 	#testCase.append('''{1,{},2}''')
 	#testCase.append('''{1,"string",[4]="string",nil,[5]=nil,true,false}''')
 	#testCase.append('''{'\\\''}''')
-	#testCase.append(r'''{'\\"\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?'}''')
+	#testCase.append('{\'\\\\"\\x08\\x0c\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:\\\\\',./<>?\'}')
 	#testCase.append('''{["\\\\\"\\x08\\x0c\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"] = 1, }''')
-	testCase.append('''{"\\\"","\\n"}''')
+	#testCase.append("{\"\\\"\",\"\\n\"}")
 
+
+	testCase.append(r'''{'\\"\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?'}''')
 
 	for index, each in enumerate(testCase):
 		print index, ': len' ,len(each)

@@ -678,9 +678,30 @@ class PyLuaTblParser(object):
 			raise TypeError('strLuaTrans input is not str"')
 
 		result = ""
+		pre = False
 		for index,char in enumerate(s):
-			if char == '"' and self._isReal(index, s):
+			#if char == '"' and self._isReal(index, s):
+				#result += '\\"'
+			#else:
+				#result += char
+			if char == '\\':
+				result += '\\\\'
+			elif char == '"':
 				result += '\\"'
+			elif char == '\a':
+				result += '\\a'
+			elif char == '\b':
+				result += '\\b'
+			elif char == '\f':
+				result += '\\f'
+			elif char == '\n':
+				result += '\\n'
+			elif char == '\r':
+				result += '\\r'
+			elif char == '\v':
+				result += '\\v'
+			elif char == '\t':
+				result += '\\t'
 			else:
 				result += char
 		return result
@@ -722,15 +743,31 @@ class PyLuaTblParser(object):
 			while index < (len(s)):
 				if pre:
 					if s[index] == '\\':
-						result += '\\\\\\\\'							
-					elif s[index] in char:
-						result += '\\\\' + s[index]						
-					elif s[index] in nums:
-						result += '\\\\' + s[index]						
+						result += '\\'	
+										
+					#elif s[index] in char:
+						#result += '\\\\' + s[index]						
+					#elif s[index] in nums:
+						#result += '\\\\' + s[index]		
+								
 					elif s[index] == fool:
-						result += s[index]						
+						result += s[index]
+					elif s[index] == 'a':
+						result += '\a'
+					elif s[index] == 'b':
+						result += '\b'
+					elif s[index] == 'f':
+						result += '\f'
+					elif s[index] == 'n':
+						result += '\n'	
+					elif s[index] == 'r':
+						result += '\r'	
+					elif s[index] == 't':
+						result += '\t'	
+					elif s[index] == 'v':
+						result += '\v'			
 					else:
-						result += '\\\\'
+						result += '\\'
 						result += s[index]
 						#raise TypeError('in short str \\ error')
 					pre = False	
@@ -743,40 +780,6 @@ class PyLuaTblParser(object):
 			return result
 		else:
 			return s
-
-			'''
-			if s[index] == '\\':
-				if count == 1:
-					result += r'\\'
-					count = 0
-				else:
-					count += 1
-			elif s[index] in nums:
-				if count == 0:
-					result += s[index]
-				elif count == 1:
-					numstr = s[index]
-					index += 1
-					if index < len(s) and s[index] in nums:
-						numstr += s[index]
-						index += 1
-						if index < len(s) and s[index] in nums:
-							numstr += s[index]
-							index += 1	
-					if int(numstr) != 0:
-						result += chr(int(numstr))
-					count = 0
-				else:
-					raise TypeError('U see god in _transAscii')
-			elif s[index] in char:
-				pass
-			else:
-				if count == 0:
-					result += s[index]
-			
-			index += 1
-			'''
-		
 
 	
 	def _overRange(self):
