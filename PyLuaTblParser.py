@@ -74,7 +74,12 @@ class PyLuaTblParser(object):
 	def loadDict(self, d):
 		#self.pyDict = {}
 		#self.pyList = []
-		myd = self.deepCopyDict(d)
+		myd = {}
+		if isinstance(d, list):
+			ml = self.deepCopyList(d)
+			self._list2Dict(ml, myd)
+		else:
+			myd = self.deepCopyDict(d)
 		for key in myd:
 			if isinstance(key, str) or isinstance(key, int) or isinstance(key, float):
 				self.pyDict[key] = myd[key]
@@ -84,8 +89,14 @@ class PyLuaTblParser(object):
 		'''
 		
 		'''
-		self._list2Dict()
-		return self.deepCopyDict(self.pyDict)
+		if len(self.pyDict) == 0:
+			if len(self.pyList) == 0:
+				return {}
+			else:
+				return self.deepCopyList(self.pyList)
+		else:
+			self._list2Dict(self.pyList, self.pyDict)
+			return self.deepCopyDict(self.pyDict)
 
 	#private fun
 	def _lex(self):
@@ -205,9 +216,9 @@ class PyLuaTblParser(object):
 
 	
 				if self.stat == 0:
-					self.tmpKey = recur.dumpDict()	
+					self.tmpKey = recur.dumpDict()
 				else:
-					self.tmpVal = recur.dumpDict()	
+					self.tmpVal = recur.dumpDict()
 				self.stat = 2
 				self._next()
 
@@ -398,7 +409,7 @@ class PyLuaTblParser(object):
 			ocurr = self.curr
 			self.curr = ret + 1
 			insideStr = self.luaTblContent[ocurr:ret]
-			return self._transAscii(insideStr)
+			return self._transAscii(insideStr, 0 , pat)
 
 	def _next(self):
 		self.curr += 1
@@ -527,12 +538,26 @@ class PyLuaTblParser(object):
 
 	def deepCopyDict(self, d):
 		result = {}
-		for key in d:
+		for key in d.keys():
 			if isinstance(d[key], dict):
 				result[key] = self.deepCopyDict(d[key])
+			elif isinstance(d[key], list):
+				result[key] = self.deepCopyList(d[key])
 			else:
 				result[key] = d[key]
 		return result
+
+	def deepCopyList(self, l):
+		result = []
+		for item in l:
+			if isinstance(item, dict):
+				result.append(self.deepCopyDict(item))
+			elif isinstance(item, list):
+				result.append(self.deepCopyList(item))
+			else:
+				result.append(item)
+		return result
+
 
 	def _2lua(self):
 		mystr = '{'
@@ -542,6 +567,8 @@ class PyLuaTblParser(object):
 
 		return mystr
 	def _dict2lua(self, d):
+		if isinstance(d, list):
+			return self._list2lua(d)
 		mystr = '{'
 		
 		for key in d:
@@ -559,10 +586,8 @@ class PyLuaTblParser(object):
 			mystr += ']'
 			mystr += ' = ' 
 
-			if isinstance(d[key] , dict):
+			if isinstance(d[key], list) or isinstance(d[key], dict):
 				mystr += self._dict2lua(d[key])
-			elif isinstance(d[key], list):
-				raise TypeError('U see list god')
 			elif d[key] == False and isinstance(d[key], bool):
 				mystr += 'false'
 			elif d[key] == True and isinstance(d[key], bool):
@@ -574,6 +599,8 @@ class PyLuaTblParser(object):
 				mystr += '"'
 			elif d[key] == None:
 				mystr += 'nil'
+			elif isinstance(d[key], PyLuaTblParser):
+				mystr += d[key].dump()
 			else:
 				mystr += str(d[key])
 			mystr += ', '
@@ -581,28 +608,25 @@ class PyLuaTblParser(object):
 		return mystr
 
 	def _list2lua(self, l):
-		mystr = ''
+		mystr = '{'
 		for item in l:
-
-			if isinstance(d[key] , dict):
-				mystr += self._dict2lua(d[key])
-			elif isinstance(d[key], list):
-				raise TypeError('U see list god')
-			elif d[key] == False and isinstance(d[key], bool):
+			if isinstance(item, list) or isinstance(item, dict):
+				mystr += self._dict2lua(item)
+			elif item == False and isinstance(item, bool):
 				mystr += 'false'
-			elif d[key] == True and isinstance(d[key], bool):
+			elif item == True and isinstance(item, bool):
 				mystr += 'true'
-			elif isinstance(d[key], str):
+			elif isinstance(item, str):
 				mystr += '"'
-				tmp = self._strLuaTrans(d[key])
+				tmp = self._strLuaTrans(item)
 				mystr += tmp
 				mystr += '"'
-			elif d[key] == None:
+			elif item == None:
 				mystr += 'nil'
 			else:
-				mystr += str(d[key])
+				mystr += str(item)
 			mystr += ', '
-		#mystr += '}'
+		mystr += '}'
 		return mystr
 
 	def _longBrackets(self):
@@ -636,18 +660,18 @@ class PyLuaTblParser(object):
 			self.curr = ret + len(pat) 
 			return self._transAscii(tmpstr, 1)
 
-	def _list2Dict(self):
-		if len(self.pyList) == 0:
+	def _list2Dict(self, l , d):
+		if len(l) == 0:
 			return
-		for index, item in enumerate(self.pyList):
+		for index, item in enumerate(l):
 			if item == None:
 				'''
 				if index in self.pyDict:
 					del self.pyDict[index]
 				'''
-				self.pyDict[index+1] = item
+				d[index+1] = item
 			else:
-				self.pyDict[index+1] = item
+				d[index+1] = item
 
 	def _strLuaTrans(self, s):
 		if not isinstance(s, str):
@@ -676,14 +700,19 @@ class PyLuaTblParser(object):
 
 		return False
 
-	def _transAscii(self, s, longStr = 0):
+	def _transAscii(self, s, longStr = 0, pat = '\''):
 		'''
 		lua str to py str
 		'''
 		nums = ('0', '1', '2', '3', '4', '5', '6','7','8','9')
 		c = 'abfnrtv'
 		char = tuple(c)
-		fool = ('\'','\"')
+		if pat == '\'':
+			fool = '\''
+		else:
+			fool = '"'
+
+		#fool = None
 
 		pre = False
 		result = ''
@@ -698,7 +727,7 @@ class PyLuaTblParser(object):
 						result += '\\\\' + s[index]						
 					elif s[index] in nums:
 						result += '\\\\' + s[index]						
-					elif s[index] in fool:
+					elif s[index] == fool:
 						result += s[index]						
 					else:
 						result += '\\\\'

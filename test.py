@@ -107,12 +107,17 @@ if __name__ == '__main__':
 		print 'yes'
 	'''
 	
-	testCase.append('''{"abc\\n",'abc\n','\\\"','\\0123','string"','\\\\','string\"',[[\n\r\'\""']],'\\x59'}''')
-	testCase.append('''{1,2,{"\'", {},[[}]], --[==[\n]==]} --\n}''')
-	testCase.append('''{1.2, .3, 0x1,1.e-1--\n, }''')
-	testCase.append('''{--{}\n{"abc\\n", '"a"', _abv = 1 }}''')
-
-	testCase.append('''{1,"string",[4]="string",nil,[5]=nil,true,false}''')
+	#testCase.append('''{"\\\"\\a"}''')
+	#testCase.append('''{"abc\\n",'abc\n','\\\"','\\0123','string"','\\\\','string\"',[[\n\r\'\""']],'\\x59'}''')
+	#testCase.append('''{1,2,{"\'", {},[[}]], --[==[\n]==]} --\n}''')
+	#testCase.append('''{1.2, .3, 0x1,1.e-1--\n, }''')
+	#testCase.append('''{--{}\n{"abc\\n", '"a"', _abv = 1 }}''')
+	#testCase.append('''{1,{},2}''')
+	#testCase.append('''{1,"string",[4]="string",nil,[5]=nil,true,false}''')
+	#testCase.append('''{'\\\''}''')
+	#testCase.append(r'''{'\\"\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?'}''')
+	#testCase.append('''{["\\\\\"\\x08\\x0c\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?"] = 1, }''')
+	testCase.append('''{"\\\"","\\n"}''')
 
 
 	for index, each in enumerate(testCase):
@@ -122,10 +127,14 @@ if __name__ == '__main__':
 		a1 = PyLuaTblParser()
 		a2 = PyLuaTblParser()
 		a3 = PyLuaTblParser()
-		
-		a1.load(each)
-		d1 = a1.dumpDict()
+		#a4 = PyLuaTblParser()
 
+
+		a1.load(each)
+
+		d1 = a1.dumpDict()
+		#a = r'\\"\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?'
+		#d1 = [a]
 		a2.loadDict(d1)		
 		a2.dumpLuaTable(file_path)
 		a3.loadLuaTable(file_path)
